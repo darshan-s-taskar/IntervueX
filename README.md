@@ -383,7 +383,3 @@ Local verification has covered authentication, report ownership, PDF parsing/exp
 | Dependency audit reports advisories | Review the recorded findings and compatibility before upgrading. Avoid applying `npm audit fix --force` without testing. |
 
 The included configuration targets local development. Before publishing your own changes, keep `.env` files, database files, caches, logs, and generated personal resumes out of version control. The existing `.gitignore` covers private environment files, database files, dependencies, tools, caches, runtime directories, and generated files under `output/`. Only the credential-free `.env.example` templates are intended for version control.
-
-## Acknowledgements
-
-IntervueX is based on the open-source [interview-ai-yt project by ankurdotio](https://github.com/ankurdotio/interview-ai-yt), with local setup fixes, IntervueX branding, configuration improvements, and verification scripts.
