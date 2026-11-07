@@ -2,6 +2,7 @@ const express = require("express")
 const authMiddleware = require("../middlewares/auth.middleware")
 const interviewController = require("../controllers/interview.controller")
 const upload = require("../middlewares/file.middleware")
+const { aiLimiter, generationSlot } = require("../middlewares/limits.middleware")
 
 const interviewRouter = express.Router()
 
@@ -12,7 +13,7 @@ const interviewRouter = express.Router()
  * @description generate new interview report on the basis of user self description,resume pdf and job description.
  * @access private
  */
-interviewRouter.post("/", authMiddleware.authUser, upload.single("resume"), interviewController.generateInterViewReportController)
+interviewRouter.post("/", authMiddleware.authUser, aiLimiter, upload.single("resume"), generationSlot(interviewController.generateInterViewReportController))
 
 /**
  * @route GET /api/interview/report/:interviewId
@@ -31,11 +32,11 @@ interviewRouter.get("/", authMiddleware.authUser, interviewController.getAllInte
 
 
 /**
- * @route GET /api/interview/resume/pdf
+ * @route POST /api/interview/resume/pdf/:interviewReportId
  * @description generate resume pdf on the basis of user self description, resume content and job description.
  * @access private
  */
-interviewRouter.post("/resume/pdf/:interviewReportId", authMiddleware.authUser, interviewController.generateResumePdfController)
+interviewRouter.post("/resume/pdf/:interviewReportId", authMiddleware.authUser, aiLimiter, generationSlot(interviewController.generateResumePdfController))
 
 
 

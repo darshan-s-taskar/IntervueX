@@ -3,6 +3,8 @@
 **/.env
 **/.env.*
 **/.envrc
+**/.env.local
+**/*.local
 **/*.env
 **/*.env.*
 !**/.env.example
@@ -35,3 +37,12 @@
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Hosting credentials, browser profiles, private uploads and local security evidence
+**/.vercel/
+**/.render/
+**/credentials*.json
+**/*service-account*.json
+**/uploads/
+**/backups/
+**/*.har

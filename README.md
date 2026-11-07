@@ -4,7 +4,7 @@
 
 IntervueX compares a job description with your PDF resume or self-description, then uses Google Gemini to generate an interview report. Reports are saved to your account so you can revisit them and generate a tailored resume.
 
-[Repository](https://github.com/darshan-s-taskar/IntervueX) · [Installation](#installation) · [Architecture](#architecture) · [Project workflow](#project-workflow) · [Start and stop](#start-and-stop) · [Troubleshooting](#troubleshooting)
+[Repository](https://github.com/darshan-s-taskar/IntervueX) · [Installation](#installation) · [Architecture](#architecture) · [Project workflow](#project-workflow) · [Start and stop](#start-and-stop) · [Production deployment](#production-deployment) · [Troubleshooting](#troubleshooting)
 
 ## Features
 
@@ -26,7 +26,7 @@ Resume uploads support **PDF files up to 3 MB**. DOCX parsing and OCR for scanne
 | Database | MongoDB, Mongoose 9 |
 | Authentication | JSON Web Tokens, HttpOnly cookies, bcryptjs, token blacklist |
 | AI generation | Google Gemini through `@google/genai` |
-| Structured AI output | Zod, zod-to-json-schema |
+| Structured AI output | Zod 4 with native JSON Schema conversion |
 | Resume upload and reading | Multer in-memory uploads, pdf-parse |
 | PDF export | Puppeteer and Chrome for Testing |
 | Checks | ESLint, Vite build, Node.js test runner, Puppeteer browser checks |
@@ -154,7 +154,7 @@ The commands below use **Windows PowerShell**, including the integrated terminal
 
 Install or make available:
 
-- **Node.js 24 LTS** with npm: [official download](https://nodejs.org/en/download). The backend declares Node.js `>=22.16.0`; Node 24 was used for local verification.
+- **Node.js 24 LTS** with npm: [official download](https://nodejs.org/en/download). Both packages declare Node.js `24.x`. Use the current patched Node 24 release on hosting platforms.
 - **Git** to clone the repository: [official download](https://git-scm.com/downloads). Alternatively, download and extract the repository ZIP.
 - **MongoDB:** choose a local Community Server or MongoDB Atlas, as explained below.
 - **A Gemini API key:** create your own key in [Google AI Studio](https://aistudio.google.com/apikey).
@@ -237,7 +237,7 @@ Edit **`Backend/.env`** and **`Frontend/.env`**, not files named `Backend.env` o
 
 | Frontend variable | Purpose | Default |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | Backend origin, without an `/api` suffix | `http://localhost:3000` |
+| `VITE_API_BASE_URL` | Optional development backend origin, without `/api`; production ignores this setting | Blank uses the Vite `/api` proxy to port 3000 |
 
 Keep the generated JWT secret and paste your Gemini key privately after `GOOGLE_GENAI_API_KEY=`. Do not put backend secrets in any `VITE_` variable: those values are exposed to the browser. Environment files are ignored by Git; `.env.example` templates can be committed.
 
@@ -329,7 +329,7 @@ The frontend uses credentialed requests. Protected endpoints require the JWT coo
 | `POST` | `/api/auth/register` | Public | Register with `username`, `email`, and `password` |
 | `POST` | `/api/auth/login` | Public | Log in with `email` and `password` |
 | `GET` | `/api/auth/get-me` | Required | Retrieve the current user |
-| `GET` | `/api/auth/logout` | Cookie if present | Clear the session and blacklist the token |
+| `POST` | `/api/auth/logout` | Authenticated cookie | Clear the session and blacklist the token |
 | `POST` | `/api/interview/` | Required | Generate and save an interview report |
 | `GET` | `/api/interview/` | Required | List the current user's reports |
 | `GET` | `/api/interview/report/:interviewId` | Required | Retrieve an owned report |
@@ -382,4 +382,33 @@ Local verification has covered authentication, report ownership, PDF parsing/exp
 | PowerShell blocks `npm.ps1` | Use `npm.cmd`, as shown in this guide. |
 | Dependency audit reports advisories | Review the recorded findings and compatibility before upgrading. Avoid applying `npm audit fix --force` without testing. |
 
-The included configuration targets local development. Before publishing your own changes, keep `.env` files, database files, caches, logs, and generated personal resumes out of version control. The existing `.gitignore` covers private environment files, database files, dependencies, tools, caches, runtime directories, and generated files under `output/`. Only the credential-free `.env.example` templates are intended for version control.
+## Production deployment
+
+Deployment configuration is prepared for **GitHub + Render (API) + Vercel (frontend) + MongoDB Atlas**. See [DEPLOYMENT-REPORT.md](DEPLOYMENT-REPORT.md) for account actions, environment settings, verification evidence, current deployment status, and redeployment instructions. Configuration files alone do not mean the application has been deployed.
+
+```text
+Browser -> https://<frontend>.vercel.app/api/* -> Render Express API
+                                               |-> MongoDB Atlas
+                                               |-> Google Gemini
+                                               |-> Chromium PDF renderer
+```
+
+- **Render:** use root `Backend`, Docker runtime, `Dockerfile`, and build context `.` relative to that root. The image runs `npm ci --omit=dev` and starts with `npm start`, listening on `0.0.0.0:$PORT`. `render.yaml` prepares a Free service with automatic deploys disabled. Do not select paid resources without approval. Free hosting is a preview starting point; PDF memory usage and cold starts require live verification.
+- **Vercel:** use root `Frontend`, framework Vite, Node 24.x, install `npm ci`, build `npm run build`, output `dist`. Set the non-secret `BACKEND_ORIGIN` to the actual Render HTTPS origin. `Frontend/vercel.ts` evaluates that variable at configuration time, proxies `/api/*`, and serves the SPA on nested page routes. Do not set `VITE_API_BASE_URL` in production.
+- **Secrets:** enter `MONGO_URI`, `JWT_SECRET`, and `GOOGLE_GENAI_API_KEY` directly in Render's Environment page. Keep them out of Git, chat, screenshots, build output, and all `VITE_` variables. Set `FRONTEND_URL` to the exact HTTPS Vercel production origin with no trailing slash. Cookies are host-only, HttpOnly, Secure in production, and SameSite=Lax. The proxy makes browser API calls same-origin.
+- **Abuse controls:** login/registration allow 30 attempts per IP per 15 minutes; AI endpoints allow 10 attempts per account per hour and one concurrent generation per API process. These counters are in memory. Use Google project quota controls as an additional limit. Do not enable billing during setup.
+- **PDF isolation:** the Docker image includes Linux libraries, fonts, and a matching Chrome download. Chrome runs as a non-root user with its host sandbox disabled inside the Render container. AI HTML has JavaScript, remote requests, and local file loads blocked; PDF rendering and AI calls have timeouts.
+
+Before publishing, run `node scripts/audit-security.cjs` with the verified Gitleaks binary in ignored `.tools/gitleaks`, review `git status`, and rerun the backend tests plus frontend lint/build. Local environment files, database files, caches, logs, uploads, and generated resumes stay ignored. Only credential-free `.env.example` templates belong in Git.
+
+After the actual URLs are available, run:
+
+```powershell
+node scripts/verify-deployment.cjs https://<actual-frontend-origin> --ai
+```
+
+This uses the public frontend and its API proxy to test registration, login/logout, cookie persistence, dashboard, live Gemini generation, saved-report retrieval, nested-route refresh, and readable PDF download. It makes two Gemini requests and retains a synthetic test account/report. Private evidence is saved under ignored `.runtime/deployment-*`. A successful local run with `--local` is separate from a successful deployment test.
+
+## Acknowledgements and licensing
+
+IntervueX is based on [interview-ai-yt by ankurdotio](https://github.com/ankurdotio/interview-ai-yt), with local setup fixes, IntervueX branding, configuration improvements, and verification scripts. The original backend's `ISC` package license declaration is retained. The upstream repository did not provide a root LICENSE file or copyright notice when inspected on 7 November 2026; this repository does not invent one. Confirm the applicable upstream license text and attribution before adding a project-wide license.

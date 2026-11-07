@@ -1,16 +1,15 @@
 const { GoogleGenAI } = require("@google/genai")
 const { z } = require("zod")
-const { zodToJsonSchema } = require("zod-to-json-schema")
 const puppeteer = require("puppeteer")
 
 function getAi() {
     if (!process.env.GOOGLE_GENAI_API_KEY) {
         const error = new Error("Gemini is not configured")
         error.status = 503
-        error.publicMessage = "Add GOOGLE_GENAI_API_KEY to Backend/.env and restart the backend to enable AI generation."
+        error.publicMessage = process.env.NODE_ENV === "production" ? "AI generation is temporarily unavailable." : "Add GOOGLE_GENAI_API_KEY to Backend/.env and restart the backend to enable AI generation."
         throw error
     }
-    return new GoogleGenAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY })
+    return new GoogleGenAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY, httpOptions: { timeout: 60000, retryOptions: { attempts: 1 } } })
 }
 
 
@@ -52,7 +51,8 @@ async function generateInterviewReport({ resume, selfDescription, jobDescription
         contents: prompt,
         config: {
             responseMimeType: "application/json",
-            responseJsonSchema: zodToJsonSchema(interviewReportSchema),
+            responseJsonSchema: z.toJSONSchema(interviewReportSchema),
+            maxOutputTokens: 16384,
         }
     })
 
@@ -64,19 +64,26 @@ async function generateInterviewReport({ resume, selfDescription, jobDescription
 
 
 async function generatePdfFromHtml(htmlContent) {
-    const browser = await puppeteer.launch()
+    // Render containers cannot provide Chrome's host sandbox. Only opt out there.
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: process.env.PUPPETEER_NO_SANDBOX === "true" ? ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] : [],
+    })
     try {
     const page = await browser.newPage();
     await page.setJavaScriptEnabled(false)
+    await page.setBypassServiceWorker(true)
     await page.setRequestInterception(true)
     page.on("request", request => {
         if (request.url().startsWith("data:") || request.url() === "about:blank") request.continue()
         else request.abort()
     })
-    await page.setContent(htmlContent, { waitUntil: "networkidle0" })
+    if (typeof htmlContent !== "string" || htmlContent.length > 250000) throw new Error("Invalid resume HTML")
+    // Block network and local-file loads even for AI-generated markup.
+    await page.setContent('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; font-src data:; frame-src \'none\'">' + htmlContent, { waitUntil: "load", timeout: 15000 })
 
     const pdfBuffer = await page.pdf({
-        format: "A4", margin: {
+        format: "A4", timeout: 15000, margin: {
             top: "20mm",
             bottom: "20mm",
             left: "15mm",
@@ -116,7 +123,8 @@ async function generateResumePdf({ resume, selfDescription, jobDescription }) {
         contents: prompt,
         config: {
             responseMimeType: "application/json",
-            responseJsonSchema: zodToJsonSchema(resumePdfSchema),
+            responseJsonSchema: z.toJSONSchema(resumePdfSchema),
+            maxOutputTokens: 16384,
         }
     })
 

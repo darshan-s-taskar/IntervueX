@@ -2,10 +2,12 @@ import React, { useState, useRef } from 'react'
 import "../style/home.scss"
 import { useInterview } from '../hooks/useInterview.js'
 import { useNavigate } from 'react-router'
+import { useAuth } from '../../auth/hooks/useAuth.js'
 
 const Home = () => {
 
     const { loading, error, generateReport,reports } = useInterview()
+    const { handleLogout, error: authError } = useAuth()
     const [ jobDescription, setJobDescription ] = useState("")
     const [ selfDescription, setSelfDescription ] = useState("")
     const resumeInputRef = useRef()
@@ -34,8 +36,10 @@ const Home = () => {
                 <p>IntervueX</p>
                 <h1>Create Your Custom <span className='highlight'>Interview Plan</span></h1>
                 <p>Let our AI analyze the job requirements and your unique profile to build a winning strategy.</p>
+                <button type="button" className="button" aria-label="Log out" onClick={handleLogout}>Log out</button>
             </header>
             {error && <p role="alert">{error}</p>}
+            {authError && <p role="alert">{authError}</p>}
 
             {/* Main Card */}
             <div className='interview-card'>

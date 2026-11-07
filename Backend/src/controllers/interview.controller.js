@@ -10,8 +10,11 @@ const interviewReportModel = require("../models/interviewReport.model")
  */
 async function generateInterViewReportController(req, res) {
 
-    const { selfDescription, jobDescription } = req.body
-    if (!jobDescription?.trim() || (!req.file && !selfDescription?.trim())) {
+    const { selfDescription, jobDescription } = req.body || {}
+    if (typeof jobDescription !== "string" || jobDescription.length > 50000 || (selfDescription !== undefined && (typeof selfDescription !== "string" || selfDescription.length > 50000))) {
+        return res.status(400).json({ message: "Provide text fields up to 50,000 characters each." })
+    }
+    if (!jobDescription.trim() || (!req.file && !selfDescription?.trim())) {
         return res.status(400).json({ message: "Provide a job description and either a PDF resume or a self-description." })
     }
     let resumeText = ""
@@ -29,6 +32,7 @@ async function generateInterViewReportController(req, res) {
         }
     }
 
+    if (resumeText.length > 100000) return res.status(400).json({ message: "Resume text is too long. Use a shorter PDF or a self-description." })
     const interViewReportByAi = await generateInterviewReport({
         resume: resumeText,
         selfDescription,

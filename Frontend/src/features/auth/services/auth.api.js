@@ -7,7 +7,7 @@ export async function login({ email, password }) {
     return (await api.post('/api/auth/login', { email, password })).data
 }
 export async function logout() {
-    return (await api.get('/api/auth/logout')).data
+    return (await api.post('/api/auth/logout')).data
 }
 export async function getMe() {
     return (await api.get('/api/auth/get-me')).data

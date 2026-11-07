@@ -76,6 +76,14 @@ test('IntervueX local integration checks (mocked Gemini, real MongoDB and Chromi
         const current = await request('/api/auth/get-me', { headers: { Cookie: cookie } })
         assert.equal((await current.json()).user.email, email)
     })
+    await t.test('existing accounts with long passwords can still log in', async () => {
+        const legacyPassword = randomBytes(60).toString('hex')
+        const legacyEmail = randomUUID() + '@example.invalid'
+        await users.create({ username: 'legacy_' + randomUUID(), email: legacyEmail, password: await require('bcryptjs').hash(legacyPassword, 10) })
+        const response = await request('/api/auth/login', json({ email: legacyEmail, password: legacyPassword }, null))
+        assert.equal(response.status, 200)
+        assert.equal((await response.json()).user.email, legacyEmail)
+    })
     await t.test('credentialed CORS preflight', async () => {
         const response = await request('/api/auth/login', { method: 'OPTIONS', headers: { Origin: 'http://localhost:5173', 'Access-Control-Request-Method': 'POST' } })
         assert.equal(response.headers.get('access-control-allow-origin'), 'http://localhost:5173')
@@ -128,7 +136,7 @@ test('IntervueX local integration checks (mocked Gemini, real MongoDB and Chromi
         assert.equal(pdf.subarray(0, 5).toString(), '%PDF-')
     })
     await t.test('logout invalidates the previous cookie', async () => {
-        assert.equal((await request('/api/auth/logout', { headers: { Cookie: cookie } })).status, 200)
+        assert.equal((await request('/api/auth/logout', { method: 'POST', headers: { Cookie: cookie } })).status, 200)
         assert.equal((await request('/api/auth/get-me', { headers: { Cookie: cookie } })).status, 401)
     })
 })

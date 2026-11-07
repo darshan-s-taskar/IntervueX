@@ -60,7 +60,7 @@ async function verify() {
         } else console.log('SKIP: Live Gemini generation (run with --ai to test).')
         await page.screenshot({ path: path.join(root, '.runtime', 'browser-verification.png'), fullPage: true })
         await page.evaluate(async () => {
-            const response = await fetch('http://localhost:3000/api/auth/logout', { credentials: 'include' })
+            const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
             if (!response.ok) throw new Error('Logout failed')
         })
         await page.goto('http://localhost:5173', { waitUntil: 'networkidle0' })

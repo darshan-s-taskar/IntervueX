@@ -46,7 +46,7 @@ const Register = () => {
                         <label htmlFor="password">Password</label>
                         <input
                             onChange={(e) => { setPassword(e.target.value) }}
-                            value={password} required
+                            value={password} required minLength={8} maxLength={72}
                             type="password" id="password" name='password' placeholder='Enter password' />
                     </div>
 

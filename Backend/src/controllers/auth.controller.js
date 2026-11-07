@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const tokenBlacklistModel = require("../models/blacklist.model")
 const cookieOptions = require("../config/cookie")
+const { randomUUID } = require("node:crypto")
 
 /**
  * @name registerUserController
@@ -11,12 +12,15 @@ const cookieOptions = require("../config/cookie")
  */
 async function registerUserController(req, res) {
 
-    const { username, email, password } = req.body
+    const { username, email, password } = req.body || {}
 
     if (![username, email, password].every(value => typeof value === "string" && value.trim())) {
         return res.status(400).json({
             message: "Please provide username, email and password"
         })
+    }
+    if (username.length > 100 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || Buffer.byteLength(password) > 72) {
+        return res.status(400).json({ message: "Use a valid email, username up to 100 characters, and password of 8 to 72 UTF-8 bytes." })
     }
 
     const isUserAlreadyExists = await userModel.findOne({
@@ -40,7 +44,7 @@ async function registerUserController(req, res) {
     const token = jwt.sign(
         { id: user._id, username: user.username },
         process.env.JWT_SECRET,
-        { expiresIn: "1d" }
+        { expiresIn: "1d", algorithm: "HS256", jwtid: randomUUID() }
     )
 
     res.cookie("token", token, { ...cookieOptions, maxAge: 86400000 })
@@ -65,9 +69,9 @@ async function registerUserController(req, res) {
  */
 async function loginUserController(req, res) {
 
-    const { email, password } = req.body
+    const { email, password } = req.body || {}
 
-    if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
+    if (typeof email !== "string" || typeof password !== "string" || !email || !password || email.length > 254) {
         return res.status(400).json({ message: "Please provide email and password." })
     }
 
@@ -90,7 +94,7 @@ async function loginUserController(req, res) {
     const token = jwt.sign(
         { id: user._id, username: user.username },
         process.env.JWT_SECRET,
-        { expiresIn: "1d" }
+        { expiresIn: "1d", algorithm: "HS256", jwtid: randomUUID() }
     )
 
     res.cookie("token", token, { ...cookieOptions, maxAge: 86400000 })
